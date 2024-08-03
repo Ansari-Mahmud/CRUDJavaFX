@@ -5,16 +5,11 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 import mahmud.com.crudapp.DBConnection;
 import mahmud.com.crudapp.model.Student;
-
-
 
 import java.net.URL;
 import java.sql.*;
@@ -25,6 +20,7 @@ public class AppController implements Initializable {
     Connection con;
     PreparedStatement st;
     ResultSet rs;
+
     @FXML
     private Button btnClear;
 
@@ -50,6 +46,15 @@ public class AppController implements Initializable {
     private TableColumn<Student, String> colMiddle;
 
     @FXML
+    private TableColumn<Student, String> colCourse;
+
+    @FXML
+    private TableColumn<Student, String> colGender;
+
+    @FXML
+    private TableView<Student> tableStudent;
+
+    @FXML
     private TextField txtFirst;
 
     @FXML
@@ -58,15 +63,33 @@ public class AppController implements Initializable {
     @FXML
     private TextField txtMiddle;
 
+    @FXML
+    private CheckBox chkBCA;
+
+    @FXML
+    private CheckBox chkBSC;
+
+    @FXML
+    private RadioButton radFemale;
+
+    @FXML
+    private RadioButton radMale;
+
+    @FXML
+    private ToggleGroup genderGroup;
+
     int id = 0;
+
     @FXML
     void SaveClick(ActionEvent event) throws SQLException {
         con = DBConnection.connect();
-        String sql = "insert into crud(firstname,secondname,lastname) values(?,?,?)";
+        String sql = "insert into crud(firstname,secondname,lastname, course, gender) values(?,?,?,?,?)";
         st = con.prepareStatement(sql);
         st.setString(1, txtFirst.getText());
         st.setString(2, txtMiddle.getText());
         st.setString(3, txtLast.getText());
+        st.setString(4, getCourse());
+        st.setString(5, getGender());
         st.executeUpdate();
         showStudent();
         clear();
@@ -82,31 +105,58 @@ public class AppController implements Initializable {
         con = DBConnection.connect();
         String sql = "delete from crud where cid = ?";
         st = con.prepareStatement(sql);
-        st.setInt(1,id);
+        st.setInt(1, id);
         st.executeUpdate();
         showStudent();
         clear();
     }
-    void clear(){
-        txtFirst.setText("");
-        txtMiddle.setText("");
-        txtLast.setText("");
-        btnSave.setDisable(false);
-    }
+
     @FXML
     void updateClick(ActionEvent event) throws SQLException {
         con = DBConnection.connect();
-        String sql = "update crud set firstname = ?,secondname = ?,lastname = ? where cid = ?";
+        String sql = "update crud set firstname = ?, secondname = ?, lastname = ?, course = ?, gender = ? where cid = ?";
         st = con.prepareStatement(sql);
         st.setString(1, txtFirst.getText());
         st.setString(2, txtMiddle.getText());
         st.setString(3, txtLast.getText());
-        st.setInt(4,id);
+        st.setString(4, getCourse());
+        st.setString(5, getGender());
+        st.setInt(6, id);
         st.executeUpdate();
         showStudent();
         clear();
     }
-    public ObservableList<Student> getStudent(){
+
+    private String getCourse() {
+        StringBuilder courses = new StringBuilder();
+        if (chkBCA.isSelected()) {
+            courses.append("BCA");
+        }
+        if (chkBSC.isSelected()) {
+            if (courses.length() > 0) {
+                courses.append(", ");
+            }
+            courses.append("BSC");
+        }
+        return courses.toString();
+    }
+
+    private String getGender() {
+        RadioButton selected = (RadioButton) genderGroup.getSelectedToggle();
+        return selected != null ? selected.getText() : "";
+    }
+
+    void clear() {
+        txtFirst.setText("");
+        txtMiddle.setText("");
+        txtLast.setText("");
+        chkBCA.setSelected(false);
+        chkBSC.setSelected(false);
+        genderGroup.selectToggle(null); // Clear radio button selection
+        btnSave.setDisable(false);
+    }
+
+    public ObservableList<Student> getStudent() {
         ObservableList<Student> students = FXCollections.observableArrayList();
         String query = "SELECT * FROM crud";
         try {
@@ -119,6 +169,8 @@ public class AppController implements Initializable {
                 student.setFname(rs.getString("firstname"));
                 student.setMname(rs.getString("secondname"));
                 student.setLname(rs.getString("lastname"));
+                student.setCourse(rs.getString("course"));
+                student.setGender(rs.getString("gender"));
                 students.add(student);
             }
         } catch (SQLException e) {
@@ -126,14 +178,18 @@ public class AppController implements Initializable {
         }
         return students;
     }
+
     public void showStudent() {
         ObservableList<Student> list = getStudent();
         tableStudent.setItems(list);
         colID.setCellValueFactory(new PropertyValueFactory<Student, Integer>("id"));
-        colFirst.setCellValueFactory(new PropertyValueFactory<Student,String>("fname"));
-        colMiddle.setCellValueFactory(new PropertyValueFactory<Student,String>("mname"));
-        colLast.setCellValueFactory(new PropertyValueFactory<Student,String>("lname"));
+        colFirst.setCellValueFactory(new PropertyValueFactory<Student, String>("fname"));
+        colMiddle.setCellValueFactory(new PropertyValueFactory<Student, String>("mname"));
+        colLast.setCellValueFactory(new PropertyValueFactory<Student, String>("lname"));
+        colCourse.setCellValueFactory(new PropertyValueFactory<Student, String>("course"));
+        colGender.setCellValueFactory(new PropertyValueFactory<Student, String>("gender"));
     }
+
     @FXML
     void getData(MouseEvent event) {
         Student student = tableStudent.getSelectionModel().getSelectedItem();
@@ -142,12 +198,24 @@ public class AppController implements Initializable {
             txtFirst.setText(student.getFname());
             txtMiddle.setText(student.getMname());
             txtLast.setText(student.getLname());
+            String course = student.getCourse();
+            chkBCA.setSelected(course.contains("BCA"));
+            chkBSC.setSelected(course.contains("BSC"));
+            if ("Male".equals(student.getGender())) {
+                radMale.setSelected(true);
+            } else if ("Female".equals(student.getGender())) {
+                radFemale.setSelected(true);
+            }
             btnSave.setDisable(true);
-
         }
     }
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        genderGroup = new ToggleGroup();
+        radMale.setToggleGroup(genderGroup);
+        radFemale.setToggleGroup(genderGroup);
+
         showStudent();
     }
 }
